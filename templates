@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Canvas Accessibility Helper (Prototype)</title>
+  <style>
+    :root { font-family: Arial, sans-serif; }
+    body { margin: 0; background: #f6f7fb; }
+    header { padding: 18px 20px; background: white; border-bottom: 1px solid #e6e8ef; }
+    header h1 { margin: 0; font-size: 18px; }
+    header p { margin: 6px 0 0; color: #4b5563; font-size: 13px; }
+
+    main { max-width: 980px; margin: 0 auto; padding: 18px 20px 120px; }
+
+    .card { background: white; border: 1px solid #e6e8ef; border-radius: 14px; padding: 14px; box-shadow: 0 1px 6px rgba(0,0,0,.04); }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 900px){ .grid { grid-template-columns: 1.2fr .8fr; } }
+
+    .chips { display:flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .chip { border: 1px solid #d6d9e6; background: #f8fafc; border-radius: 999px; padding: 8px 10px; cursor: pointer; font-size: 13px; }
+    .chip:hover { background: #eef2ff; }
+
+    /* Chat widget */
+    .chat { position: fixed; right: 18px; bottom: 18px; width: 360px; max-width: calc(100vw - 36px); }
+    .chat-panel { background: white; border: 1px solid #e6e8ef; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.14); }
+    .chat-head { background: #111827; color: white; padding: 12px 12px; display:flex; align-items:center; justify-content: space-between; }
+    .chat-head strong { font-size: 14px; }
+    .chat-head button { background: transparent; border: 0; color: white; cursor: pointer; font-size: 16px; }
+    .chat-body { height: 320px; overflow: auto; padding: 12px; background: #fafbff; }
+    .msg { margin: 10px 0; display:flex; }
+    .msg.user { justify-content: flex-end; }
+    .bubble { max-width: 85%; padding: 10px 12px; border-radius: 14px; font-size: 13px; line-height: 1.35; border: 1px solid #e6e8ef; }
+    .user .bubble { background: #111827; color: white; border-color: #111827; }
+    .bot .bubble { background: white; color: #111827; }
+
+    .chat-foot { display:flex; gap: 8px; padding: 10px; background: white; border-top: 1px solid #e6e8ef; }
+    .chat-foot input { flex:1; padding: 10px 10px; border-radius: 12px; border: 1px solid #d6d9e6; font-size: 13px; }
+    .chat-foot button { padding: 10px 12px; border-radius: 12px; border: 0; background: #2563eb; color: white; cursor:pointer; font-size: 13px; }
+    .chat-foot button:hover { background: #1d4ed8; }
+
+    .toggle { position: fixed; right: 18px; bottom: 18px; }
+    .toggle button { border:0; border-radius: 999px; padding: 12px 14px; background: #2563eb; color:white; cursor:pointer; box-shadow: 0 10px 30px rgba(0,0,0,.14); }
+    .toggle button:hover { background: #1d4ed8; }
+
+    .hint { color:#6b7280; font-size: 12px; margin-top: 10px; }
+    .small { font-size: 12px; color:#374151; }
+    .k { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#f3f4f6; padding:2px 6px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Canvas Accessibility Helper (Prototype)</h1>
+    <p>Helps neurodiverse students quickly find Canvas accessibility tips and support routes (prototype for coursework).</p>
+  </header>
+
+  <main>
+    <div class="grid">
+      <section class="card">
+        <h2 style="margin:0;font-size:16px;">What this chatbot can help with</h2>
+        <p class="small">
+          Ask about reading support, alternative formats, quiz adjustments, navigation, focus, sensory overload, and where to get help.
+          The bot uses a small knowledge base (you can expand it).
+        </p>
+
+        <div class="chips" id="quickChips">
+          <button class="chip" data-q="I struggle reading long pages. Any help?">Reading help</button>
+          <button class="chip" data-q="Can I get alternative formats like audio or EPUB?">Alternative formats</button>
+          <button class="chip" data-q="I need extra time for quizzes. What should I do?">Extra time</button>
+          <button class="chip" data-q="I get overwhelmed finding things in modules.">Navigation</button>
+          <button class="chip" data-q="I have ADHD and lose focus on Canvas. Tips?">Focus tips</button>
+          <button class="chip" data-q="Who do I contact for disability support?">Contact support</button>
+        </div>
+
+        <p class="hint">
+          Tip: Use clear phrases like “text-to-speech”, “screen reader”, “quiz extra time”, “PDF”, “alternative format”, “keyboard only”.
+        </p>
+      </section>
+
+      <aside class="card">
+        <h2 style="margin:0;font-size:16px;">How it works (for your report)</h2>
+        <ol class="small">
+          <li>User asks a question in the chat widget.</li>
+          <li>The bot detects the topic (intent) using keywords.</li>
+          <li>It returns a matching answer from the knowledge base.</li>
+          <li>If unsure, it provides safe guidance and support contacts.</li>
+        </ol>
+        <p class="small">
+          This is easy to test: you prepare sample questions and check that the intent + answer are correct.
+        </p>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Toggle button -->
+  <div class="toggle" id="chatToggle">
+    <button type="button">Chat</button>
+  </div>
+
+  <!-- Chat widget -->
+  <div class="chat" id="chatWidget" style="display:none;">
+    <div class="chat-panel" role="dialog" aria-label="Chatbot">
+      <div class="chat-head">
+        <strong>Canvas Accessibility Bot</strong>
+        <button type="button" id="closeChat" aria-label="Close chat">✕</button>
+      </div>
+      <div class="chat-body" id="chatBody" aria-live="polite"></div>
+      <div class="chat-foot">
+        <input id="chatInput" type="text" placeholder="Type your question…" />
+        <button id="sendBtn" type="button">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ====== Knowledge Base (edit/expand as you like) ======
+    // Keep answers short, step-by-step, and supportive.
+    const KB = [
+      {
+        intent: "READING_HELP",
+        keywords: ["read", "reading", "long", "overwhelmed", "dyslexia", "text", "difficult to read", "fatigue", "visual stress"],
+        answer: [
+          "If reading long pages feels hard, try these steps:",
+          "1) Use your browser zoom: Ctrl + + (Windows) or Cmd + + (Mac).",
+          "2) Break content into smaller chunks (read headings first, then details).",
+          "3) If your module provides a ‘Listen’/text-to-speech option, use it to hear the page while reading.",
+          "If you still struggle, message your module team and ask for materials in a format that works for you."
+        ]
+      },
+      {
+        intent: "ALT_FORMATS",
+        keywords: ["alternative format", "audio", "epub", "pdf", "format", "download format", "html version", "convert"],
+        answer: [
+          "Alternative formats depend on what your course has enabled.",
+          "Try this:",
+          "1) Open the file/page in Canvas and look for an ‘Alternative Formats’ option (sometimes shown as an icon near the content).",
+          "2) If you can’t see it, ask your lecturer/module team whether alternative formats are available for that resource.",
+          "Meanwhile, you can use trusted reading tools (e.g., screen reader or browser reader mode) to reduce strain."
+        ]
+      },
+      {
+        intent: "QUIZ_EXTRA_TIME",
+        keywords: ["extra time", "extended time", "quiz", "test", "exam", "time limit", "accommodation"],
+        answer: [
+          "Extra time in quizzes is usually provided as an agreed adjustment.",
+          "What to do:",
+          "1) Contact the University Disability Service (or your support route) to discuss adjustments.",
+          "2) Once approved, teaching staff can apply the extra time settings in Canvas quizzes.",
+          "If this is urgent, email your module leader explaining the difficulty and ask for guidance while your support request is processed."
+        ]
+      },
+      {
+        intent: "NAVIGATION",
+        keywords: ["find", "navigation", "modules", "where is", "lost", "too many", "confusing", "pages", "assignments"],
+        answer: [
+          "If Canvas navigation feels confusing, try this routine:",
+          "1) Start from ‘Modules’ and follow the weekly/unit structure (if the course uses it).",
+          "2) Use the Canvas search (if available) or your browser search on the page: Ctrl + F / Cmd + F.",
+          "3) Open links in a new tab so you don’t lose your place.",
+          "If a course is poorly structured, tell the module team what would help (clear weekly headings, fewer clicks, consistent naming)."
+        ]
+      },
+      {
+        intent: "FOCUS_ADHD",
+        keywords: ["adhd", "focus", "distracted", "attention", "overstimulated", "sensory", "anxious", "overload"],
+        answer: [
+          "If you lose focus on Canvas, these small changes can help:",
+          "1) Work in 10–15 minute blocks (timer), then take a short break.",
+          "2) Keep only one Canvas tab open at a time.",
+          "3) Use a checklist: ‘What do I need to do next?’ (one task).",
+          "4) Reduce distractions: full-screen browser, quiet mode, or reader mode where possible.",
+          "If you want, tell me what you’re trying to do (read, submit, quiz) and I’ll suggest a simpler path."
+        ]
+      },
+      {
+        intent: "SCREENREADER_KEYBOARD",
+        keywords: ["screen reader", "keyboard", "tab key", "accessibility", "aria", "contrast", "captions"],
+        answer: [
+          "Accessibility tips for screen reader / keyboard-only use:",
+          "1) Use Tab / Shift+Tab to move through controls and Enter to activate.",
+          "2) Increase contrast and text size using browser settings.",
+          "3) If videos are used, look for captions or transcripts.",
+          "If a page element is not accessible, report it to the module team and include what device/browser you’re using."
+        ]
+      },
+      {
+        intent: "CONTACT_SUPPORT",
+        keywords: ["contact", "support", "disability", "help", "who do i talk to", "uob", "bradford", "service"],
+        answer: [
+          "If you need disability-related study support, contact the University Disability Service.",
+          "They can advise on adjustments and support routes.",
+          "If your issue is technical (login, access, errors), contact University IT support.",
+          "If you tell me whether it’s an adjustment issue or a technical error, I can guide you to the right place."
+        ]
+      }
+    ];
+
+    const FALLBACK = [
+      "I might not have enough information for that yet.",
+      "Try rephrasing with keywords like: ‘quiz extra time’, ‘alternative formats’, ‘text-to-speech’, ‘screen reader’, or ‘navigation’.",
+      "If this is urgent or affects assessments, contact your module team and the University support services."
+    ];
+
+    // ====== Simple intent detection ======
+    function detectIntent(userText) {
+      const t = userText.toLowerCase();
+      let best = null;
+      let bestScore = 0;
+
+      for (const item of KB) {
+        let score = 0;
+        for (const kw of item.keywords) {
+          const k = kw.toLowerCase();
+          if (t.includes(k)) score += 1;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          best = item;
+        }
+      }
+      // threshold: require at least 1 keyword hit
+      return bestScore >= 1 ? best : null;
+    }
+
+    // ====== UI helpers ======
+    const chatWidget = document.getElementById("chatWidget");
+    const toggle = document.getElementById("chatToggle");
+    const closeChat = document.getElementById("closeChat");
+    const body = document.getElementById("chatBody");
+    const input = document.getElementById("chatInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    function addMsg(text, who="bot") {
+      const wrap = document.createElement("div");
+      wrap.className = "msg " + who;
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+
+      wrap.appendChild(bubble);
+      body.appendChild(wrap);
+      body.scrollTop = body.scrollHeight;
+    }
+
+    function addBotLines(lines) {
+      for (const line of lines) addMsg(line, "bot");
+    }
+
+    function send() {
+      const q = input.value.trim();
+      if (!q) return;
+      addMsg(q, "user");
+      input.value = "";
+
+      const match = detectIntent(q);
+      if (match) {
+        addBotLines(match.answer);
+      } else {
+        addBotLines(FALLBACK);
+      }
+    }
+
+    // ====== Events ======
+    toggle.addEventListener("click", () => {
+      chatWidget.style.display = "block";
+      toggle.style.display = "none";
+      if (body.childElementCount === 0) {
+        addBotLines([
+          "Hi! I’m the Canvas Accessibility Bot (prototype).",
+          "Ask me about reading support, alternative formats, quiz extra time, navigation, focus tips, or support contacts."
+        ]);
+      }
+      input.focus();
+    });
+
+    closeChat.addEventListener("click", () => {
+      chatWidget.style.display = "none";
+      toggle.style.display = "block";
+    });
+
+    sendBtn.addEventListener("click", send);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") send();
+    });
+
+    // Quick chips
+    document.getElementById("quickChips").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-q]");
+      if (!btn) return;
+      if (chatWidget.style.display === "none") {
+        chatWidget.style.display = "block";
+        toggle.style.display = "none";
+        if (body.childElementCount === 0) {
+          addBotLines([
+            "Hi! I’m the Canvas Accessibility Bot (prototype).",
+            "Ask me about reading support, alternative formats, quiz extra time, navigation, focus tips, or support contacts."
+          ]);
+        }
+      }
+      input.value = btn.dataset.q;
+      send();
+    });
+  </script>
+</body>
+</html>
